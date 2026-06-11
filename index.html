@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ganancias Conductor</title>
+<meta name="theme-color" content="#101828">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="encabezado">
+  <h1>🚗 Ganancias Conductor</h1>
+  <p id="fecha-actual"></p>
+</header>
+
+<main>
+  <!-- TAB HOY -->
+  <section id="tab-hoy" class="tab activa">
+    <div class="tarjetas-mini">
+      <div class="mini"><span>Bruto hoy</span><strong id="hoy-bruto">₲ 0</strong></div>
+      <div class="mini"><span>Gastos hoy</span><strong id="hoy-gastos">₲ 0</strong></div>
+      <div class="mini neto"><span>Neto hoy</span><strong id="hoy-neto">₲ 0</strong></div>
+    </div>
+
+    <form id="form-ganancia" class="tarjeta">
+      <h2>➕ Cargar ganancia</h2>
+      <div class="fila">
+        <label>Fecha <input type="date" id="g-fecha" required></label>
+        <label>Plataforma
+          <select id="g-plataforma">
+            <option value="uber">Uber</option>
+            <option value="muv">MUV</option>
+            <option value="bolt">Bolt</option>
+          </select>
+        </label>
+      </div>
+      <div class="fila">
+        <label>Monto (₲) <input type="number" id="g-monto" min="1" inputmode="numeric" required placeholder="150000"></label>
+        <label>Viajes <input type="number" id="g-viajes" min="0" inputmode="numeric" placeholder="opcional"></label>
+      </div>
+      <button type="submit" class="btn verde">Guardar ganancia</button>
+    </form>
+
+    <form id="form-gasto" class="tarjeta">
+      <h2>➖ Cargar gasto</h2>
+      <div class="fila">
+        <label>Fecha <input type="date" id="e-fecha" required></label>
+        <label>Categoría
+          <select id="e-categoria">
+            <option value="combustible">Combustible</option>
+            <option value="mantenimiento">Mantenimiento</option>
+            <option value="comida">Comida</option>
+            <option value="lavado">Lavado</option>
+            <option value="cuota">Cuota / Alquiler</option>
+            <option value="datos">Datos móviles</option>
+            <option value="otro">Otro</option>
+          </select>
+        </label>
+      </div>
+      <div class="fila">
+        <label>Monto (₲) <input type="number" id="e-monto" min="1" inputmode="numeric" required placeholder="50000"></label>
+        <label>Nota <input type="text" id="e-nota" maxlength="60" placeholder="opcional"></label>
+      </div>
+      <button type="submit" class="btn rojo">Guardar gasto</button>
+    </form>
+
+    <div class="tarjeta">
+      <h2>Movimientos de hoy</h2>
+      <ul id="lista-hoy" class="lista"></ul>
+    </div>
+  </section>
+
+  <!-- TAB HISTORIAL -->
+  <section id="tab-historial" class="tab">
+    <div class="tarjeta">
+      <div class="fila entre">
+        <select id="filtro-mes"></select>
+        <button id="btn-csv" class="btn gris" type="button">⬇ Exportar CSV</button>
+      </div>
+      <div id="historial"></div>
+    </div>
+  </section>
+
+  <!-- TAB RESUMEN -->
+  <section id="tab-resumen" class="tab">
+    <div class="selector-periodo" id="selector-periodo">
+      <button data-periodo="hoy" class="activa" type="button">Hoy</button>
+      <button data-periodo="semana" type="button">7 días</button>
+      <button data-periodo="mes" type="button">Mes</button>
+    </div>
+    <div class="tarjetas-mini">
+      <div class="mini"><span>Bruto</span><strong id="res-bruto">₲ 0</strong></div>
+      <div class="mini"><span>Gastos</span><strong id="res-gastos">₲ 0</strong></div>
+      <div class="mini neto"><span>Neto</span><strong id="res-neto">₲ 0</strong></div>
+    </div>
+    <div class="tarjeta"><h2>Por plataforma</h2><div id="res-plataformas"></div></div>
+    <div class="tarjeta"><h2>Gastos por categoría</h2><div id="res-categorias"></div></div>
+    <div class="tarjeta"><h2>Neto últimos 7 días</h2><div id="grafico-7d" class="grafico"></div></div>
+  </section>
+</main>
+
+<nav class="nav-inferior">
+  <button data-tab="hoy" class="activa" type="button">📝<span>Hoy</span></button>
+  <button data-tab="historial" type="button">📒<span>Historial</span></button>
+  <button data-tab="resumen" type="button">📊<span>Resumen</span></button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+// ---------- Datos ----------
+const STORE_KEY = 'conductor-registros-v1';
+
+const PLATAFORMAS = {
+  uber: { nombre: 'Uber', color: 'var(--uber)' },
+  muv:  { nombre: 'MUV',  color: 'var(--muv)' },
+  bolt: { nombre: 'Bolt', color: 'var(--bolt)' },
+};
+
+const CATEGORIAS = {
+  combustible: 'Combustible',
+  mantenimiento: 'Mantenimiento',
+  comida: 'Comida',
+  lavado: 'Lavado',
+  cuota: 'Cuota / Alquiler',
+  datos: 'Datos móviles',
+  otro: 'Otro',
+};
+
+let registros = [];
+try { registros = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { registros = []; }
+
+function guardar() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(registros));
+}
+
+// ---------- Utilidades ----------
+function fmt(n) { return '₲ ' + Math.round(n).toLocaleString('es-PY'); }
+
+function hoyISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function fechaLegible(iso, conAnio) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const fecha = new Date(a, m - 1, d);
+  const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (conAnio) opts.year = 'numeric';
+  return fecha.toLocaleDateString('es-PY', opts);
+}
+
+function bruto(regs) { return regs.filter(r => r.tipo === 'ganancia').reduce((s, r) => s + r.monto, 0); }
+function gastos(regs) { return regs.filter(r => r.tipo === 'gasto').reduce((s, r) => s + r.monto, 0); }
+
+function registrosEnRango(desde, hasta) {
+  return registros.filter(r => r.fecha >= desde && r.fecha <= hasta);
+}
+
+function diasAtras(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ---------- Alta y baja de registros ----------
+document.getElementById('form-ganancia').addEventListener('submit', e => {
+  e.preventDefault();
+  const monto = Number(document.getElementById('g-monto').value);
+  if (!monto || monto <= 0) return;
+  registros.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    tipo: 'ganancia',
+    fecha: document.getElementById('g-fecha').value,
+    plataforma: document.getElementById('g-plataforma').value,
+    monto,
+    viajes: Number(document.getElementById('g-viajes').value) || null,
+  });
+  guardar();
+  document.getElementById('g-monto').value = '';
+  document.getElementById('g-viajes').value = '';
+  renderTodo();
+});
+
+document.getElementById('form-gasto').addEventListener('submit', e => {
+  e.preventDefault();
+  const monto = Number(document.getElementById('e-monto').value);
+  if (!monto || monto <= 0) return;
+  registros.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    tipo: 'gasto',
+    fecha: document.getElementById('e-fecha').value,
+    categoria: document.getElementById('e-categoria').value,
+    monto,
+    nota: document.getElementById('e-nota').value.trim() || null,
+  });
+  guardar();
+  document.getElementById('e-monto').value = '';
+  document.getElementById('e-nota').value = '';
+  renderTodo();
+});
+
+function borrarRegistro(id) {
+  if (!confirm('¿Borrar este registro?')) return;
+  registros = registros.filter(r => r.id !== id);
+  guardar();
+  renderTodo();
+}
+
+// ---------- Render: fila de registro ----------
+function filaRegistro(r, conFecha) {
+  const li = document.createElement('li');
+  li.className = 'registro';
+
+  const chip = document.createElement('span');
+  let titulo, detalleExtra;
+  if (r.tipo === 'ganancia') {
+    chip.className = 'chip ' + r.plataforma;
+    chip.textContent = PLATAFORMAS[r.plataforma].nombre;
+    titulo = 'Ganancia';
+    detalleExtra = r.viajes ? r.viajes + ' viajes' : '';
+  } else {
+    chip.className = 'chip gasto';
+    chip.textContent = 'Gasto';
+    titulo = CATEGORIAS[r.categoria] || r.categoria;
+    detalleExtra = r.nota || '';
+  }
+
+  const det = document.createElement('div');
+  det.className = 'detalle';
+  const partes = [];
+  if (conFecha) partes.push(fechaLegible(r.fecha));
+  if (detalleExtra) partes.push(detalleExtra);
+  det.innerHTML = '<div></div><small></small>';
+  det.querySelector('div').textContent = titulo;
+  det.querySelector('small').textContent = partes.join(' · ');
+
+  const monto = document.createElement('span');
+  monto.className = 'monto ' + (r.tipo === 'ganancia' ? 'positivo' : 'negativo');
+  monto.textContent = (r.tipo === 'ganancia' ? '+' : '−') + fmt(r.monto);
+
+  const btn = document.createElement('button');
+  btn.className = 'borrar';
+  btn.textContent = '🗑';
+  btn.title = 'Borrar';
+  btn.addEventListener('click', () => borrarRegistro(r.id));
+
+  li.append(chip, det, monto, btn);
+  return li;
+}
+
+// ---------- Render: tab Hoy ----------
+function renderHoy() {
+  const hoy = hoyISO();
+  const deHoy = registros.filter(r => r.fecha === hoy);
+  const b = bruto(deHoy), g = gastos(deHoy), n = b - g;
+
+  document.getElementById('hoy-bruto').textContent = fmt(b);
+  document.getElementById('hoy-gastos').textContent = fmt(g);
+  const netoEl = document.getElementById('hoy-neto');
+  netoEl.textContent = fmt(n);
+  netoEl.classList.toggle('negativo', n < 0);
+
+  const ul = document.getElementById('lista-hoy');
+  ul.innerHTML = '';
+  if (!deHoy.length) {
+    ul.innerHTML = '<li class="vacio">Todavía no cargaste nada hoy.</li>';
+    return;
+  }
+  deHoy.slice().reverse().forEach(r => ul.appendChild(filaRegistro(r, false)));
+}
+
+// ---------- Render: tab Historial ----------
+function renderHistorial() {
+  const sel = document.getElementById('filtro-mes');
+  const meses = [...new Set(registros.map(r => r.fecha.slice(0, 7)))].sort().reverse();
+  const mesActual = hoyISO().slice(0, 7);
+  if (!meses.includes(mesActual)) meses.unshift(mesActual);
+
+  const previo = sel.value;
+  sel.innerHTML = '';
+  meses.forEach(m => {
+    const [a, mm] = m.split('-').map(Number);
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = new Date(a, mm - 1, 1).toLocaleDateString('es-PY', { month: 'long', year: 'numeric' });
+    sel.appendChild(opt);
+  });
+  sel.value = meses.includes(previo) ? previo : meses[0];
+
+  const cont = document.getElementById('historial');
+  cont.innerHTML = '';
+  const delMes = registros.filter(r => r.fecha.startsWith(sel.value));
+  if (!delMes.length) {
+    cont.innerHTML = '<p class="vacio">Sin registros en este mes.</p>';
+    return;
+  }
+
+  const porDia = {};
+  delMes.forEach(r => { (porDia[r.fecha] = porDia[r.fecha] || []).push(r); });
+
+  Object.keys(porDia).sort().reverse().forEach(fecha => {
+    const regs = porDia[fecha];
+    const neto = bruto(regs) - gastos(regs);
+    const grupo = document.createElement('div');
+    grupo.className = 'grupo-dia';
+    const h3 = document.createElement('h3');
+    const spanFecha = document.createElement('span');
+    spanFecha.textContent = fechaLegible(fecha, true);
+    const spanNeto = document.createElement('span');
+    spanNeto.className = 'neto-dia' + (neto < 0 ? ' negativo' : '');
+    spanNeto.textContent = 'Neto: ' + fmt(neto);
+    h3.append(spanFecha, spanNeto);
+    grupo.appendChild(h3);
+    regs.slice().reverse().forEach(r => grupo.appendChild(filaRegistro(r, false)));
+    cont.appendChild(grupo);
+  });
+}
+
+document.getElementById('filtro-mes').addEventListener('change', renderHistorial);
+
+// ---------- Exportar CSV ----------
+document.getElementById('btn-csv').addEventListener('click', () => {
+  const mes = document.getElementById('filtro-mes').value;
+  const delMes = registros.filter(r => r.fecha.startsWith(mes)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const filas = [['fecha', 'tipo', 'plataforma_o_categoria', 'monto_gs', 'viajes', 'nota']];
+  delMes.forEach(r => filas.push([
+    r.fecha,
+    r.tipo,
+    r.tipo === 'ganancia' ? PLATAFORMAS[r.plataforma].nombre : (CATEGORIAS[r.categoria] || r.categoria),
+    r.monto,
+    r.viajes || '',
+    r.nota || '',
+  ]));
+  const csv = filas.map(f => f.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ganancias-' + mes + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---------- Render: tab Resumen ----------
+let periodo = 'hoy';
+
+document.getElementById('selector-periodo').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  periodo = btn.dataset.periodo;
+  document.querySelectorAll('#selector-periodo button').forEach(b => b.classList.toggle('activa', b === btn));
+  renderResumen();
+});
+
+function regsDelPeriodo() {
+  const hoy = hoyISO();
+  if (periodo === 'hoy') return registrosEnRango(hoy, hoy);
+  if (periodo === 'semana') return registrosEnRango(diasAtras(6), hoy);
+  return registros.filter(r => r.fecha.startsWith(hoy.slice(0, 7)));
+}
+
+function barra(cont, etiqueta, valor, max, color) {
+  const fila = document.createElement('div');
+  fila.className = 'barra-fila';
+  const etiquetas = document.createElement('div');
+  etiquetas.className = 'etiquetas';
+  etiquetas.innerHTML = '<span></span><span class="valor"></span>';
+  etiquetas.children[0].textContent = etiqueta;
+  etiquetas.children[1].textContent = fmt(valor);
+  const pista = document.createElement('div');
+  pista.className = 'barra-pista';
+  const relleno = document.createElement('div');
+  relleno.className = 'barra-relleno';
+  relleno.style.width = (max > 0 ? Math.max(2, (valor / max) * 100) : 0) + '%';
+  relleno.style.background = color;
+  pista.appendChild(relleno);
+  fila.append(etiquetas, pista);
+  cont.appendChild(fila);
+}
+
+function renderResumen() {
+  const regs = regsDelPeriodo();
+  const b = bruto(regs), g = gastos(regs), n = b - g;
+
+  document.getElementById('res-bruto').textContent = fmt(b);
+  document.getElementById('res-gastos').textContent = fmt(g);
+  const netoEl = document.getElementById('res-neto');
+  netoEl.textContent = fmt(n);
+  netoEl.classList.toggle('negativo', n < 0);
+
+  // Por plataforma
+  const contP = document.getElementById('res-plataformas');
+  contP.innerHTML = '';
+  const totalesP = Object.keys(PLATAFORMAS).map(p => ({
+    p,
+    total: regs.filter(r => r.tipo === 'ganancia' && r.plataforma === p).reduce((s, r) => s + r.monto, 0),
+  }));
+  const maxP = Math.max(...totalesP.map(t => t.total));
+  if (maxP === 0) contP.innerHTML = '<p class="vacio">Sin ganancias en este período.</p>';
+  else totalesP.filter(t => t.total > 0).sort((a, b2) => b2.total - a.total)
+    .forEach(t => barra(contP, PLATAFORMAS[t.p].nombre, t.total, maxP, PLATAFORMAS[t.p].color));
+
+  // Gastos por categoría
+  const contC = document.getElementById('res-categorias');
+  contC.innerHTML = '';
+  const totalesC = Object.keys(CATEGORIAS).map(c => ({
+    c,
+    total: regs.filter(r => r.tipo === 'gasto' && r.categoria === c).reduce((s, r) => s + r.monto, 0),
+  })).filter(t => t.total > 0).sort((a, b2) => b2.total - a.total);
+  if (!totalesC.length) contC.innerHTML = '<p class="vacio">Sin gastos en este período.</p>';
+  else {
+    const maxC = totalesC[0].total;
+    totalesC.forEach(t => barra(contC, CATEGORIAS[t.c], t.total, maxC, 'var(--rojo)'));
+  }
+
+  // Gráfico neto últimos 7 días
+  const graf = document.getElementById('grafico-7d');
+  graf.innerHTML = '';
+  const dias = [];
+  for (let i = 6; i >= 0; i--) {
+    const f = diasAtras(i);
+    const regsDia = registros.filter(r => r.fecha === f);
+    dias.push({ fecha: f, neto: bruto(regsDia) - gastos(regsDia) });
+  }
+  const maxAbs = Math.max(1, ...dias.map(d => Math.abs(d.neto)));
+  dias.forEach(d => {
+    const col = document.createElement('div');
+    col.className = 'columna';
+    const palo = document.createElement('div');
+    palo.className = 'palo' + (d.neto < 0 ? ' negativo' : '');
+    palo.style.height = Math.max(2, (Math.abs(d.neto) / maxAbs) * 100) + '%';
+    palo.title = fechaLegible(d.fecha) + ': ' + fmt(d.neto);
+    const lbl = document.createElement('small');
+    lbl.textContent = fechaLegible(d.fecha).split(',')[0];
+    col.append(palo, lbl);
+    graf.appendChild(col);
+  });
+}
+
+// ---------- Navegación entre tabs ----------
+document.querySelector('.nav-inferior').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('.nav-inferior button').forEach(b => b.classList.toggle('activa', b === btn));
+  document.querySelectorAll('main .tab').forEach(t => t.classList.toggle('activa', t.id === 'tab-' + btn.dataset.tab));
+});
+
+// ---------- Inicialización ----------
+function renderTodo() {
+  renderHoy();
+  renderHistorial();
+  renderResumen();
+}
+
+document.getElementById('g-fecha').value = hoyISO();
+document.getElementById('e-fecha').value = hoyISO();
+document.getElementById('fecha-actual').textContent =
+  new Date().toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+renderTodo();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
