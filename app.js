@@ -47,16 +47,62 @@ function registrosEnRango(desde, hasta) {
   return registros.filter(r => r.fecha >= desde && r.fecha <= hasta);
 }
 
-function diasAtras(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
+function aISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
+
+function sumarDias(iso, n) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const fecha = new Date(a, m - 1, d);
+  fecha.setDate(fecha.getDate() + n);
+  return aISO(fecha);
+}
+
+// Lunes de la semana a la que pertenece la fecha (semana lun–dom).
+function lunesDe(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const fecha = new Date(a, m - 1, d);
+  const desdeLunes = (fecha.getDay() + 6) % 7; // 0 = lunes ... 6 = domingo
+  return sumarDias(iso, -desdeLunes);
+}
+
+// ---------- Separador de miles en los campos de monto ----------
+function formatoMiles(texto) {
+  const digitos = String(texto).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  return digitos ? Number(digitos).toLocaleString('es-PY') : '';
+}
+
+function montoDe(input) {
+  return Number(input.value.replace(/\D/g, ''));
+}
+
+function conSeparadorMiles(input) {
+  input.addEventListener('input', () => {
+    const posicion = input.selectionStart;
+    const digitosAntes = input.value.slice(0, posicion).replace(/\D/g, '').length;
+    input.value = formatoMiles(input.value);
+
+    // Reubicar el cursor después de la misma cantidad de dígitos que tenía delante.
+    let cursor = 0;
+    if (digitosAntes > 0) {
+      let vistos = 0;
+      cursor = input.value.length;
+      for (let i = 0; i < input.value.length; i++) {
+        if (/\d/.test(input.value[i])) vistos++;
+        if (vistos === digitosAntes) { cursor = i + 1; break; }
+      }
+    }
+    input.setSelectionRange(cursor, cursor);
+  });
+}
+
+conSeparadorMiles(document.getElementById('g-monto'));
+conSeparadorMiles(document.getElementById('e-monto'));
 
 // ---------- Alta y baja de registros ----------
 document.getElementById('form-ganancia').addEventListener('submit', e => {
   e.preventDefault();
-  const monto = Number(document.getElementById('g-monto').value);
+  const monto = montoDe(document.getElementById('g-monto'));
   if (!monto || monto <= 0) return;
   registros.push({
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
@@ -74,7 +120,7 @@ document.getElementById('form-ganancia').addEventListener('submit', e => {
 
 document.getElementById('form-gasto').addEventListener('submit', e => {
   e.preventDefault();
-  const monto = Number(document.getElementById('e-monto').value);
+  const monto = montoDe(document.getElementById('e-monto'));
   if (!monto || monto <= 0) return;
   registros.push({
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
@@ -191,16 +237,23 @@ function renderHistorial() {
 
   Object.keys(porDia).sort().reverse().forEach(fecha => {
     const regs = porDia[fecha];
-    const neto = bruto(regs) - gastos(regs);
+    const b = bruto(regs);
+    const neto = b - gastos(regs);
     const grupo = document.createElement('div');
     grupo.className = 'grupo-dia';
     const h3 = document.createElement('h3');
     const spanFecha = document.createElement('span');
     spanFecha.textContent = fechaLegible(fecha, true);
+    const totales = document.createElement('span');
+    totales.className = 'totales-dia';
+    const spanBruto = document.createElement('span');
+    spanBruto.className = 'bruto-dia';
+    spanBruto.textContent = 'Bruto: ' + fmt(b);
     const spanNeto = document.createElement('span');
     spanNeto.className = 'neto-dia' + (neto < 0 ? ' negativo' : '');
     spanNeto.textContent = 'Neto: ' + fmt(neto);
-    h3.append(spanFecha, spanNeto);
+    totales.append(spanBruto, spanNeto);
+    h3.append(spanFecha, totales);
     grupo.appendChild(h3);
     regs.slice().reverse().forEach(r => grupo.appendChild(filaRegistro(r, false)));
     cont.appendChild(grupo);
@@ -245,7 +298,10 @@ document.getElementById('selector-periodo').addEventListener('click', e => {
 function regsDelPeriodo() {
   const hoy = hoyISO();
   if (periodo === 'hoy') return registrosEnRango(hoy, hoy);
-  if (periodo === 'semana') return registrosEnRango(diasAtras(6), hoy);
+  if (periodo === 'semana') {
+    const lunes = lunesDe(hoy);
+    return registrosEnRango(lunes, sumarDias(lunes, 6));
+  }
   return registros.filter(r => r.fecha.startsWith(hoy.slice(0, 7)));
 }
 
@@ -303,25 +359,37 @@ function renderResumen() {
     totalesC.forEach(t => barra(contC, CATEGORIAS[t.c], t.total, maxC, 'var(--rojo)'));
   }
 
-  // Gráfico neto últimos 7 días
-  const graf = document.getElementById('grafico-7d');
+  // Gráfico neto de la semana en curso (lunes a domingo)
+  const hoy = hoyISO();
+  const lunes = lunesDe(hoy);
+  const domingo = sumarDias(lunes, 6);
+
+  const rango = document.getElementById('rango-semana');
+  const opts = { day: 'numeric', month: 'short' };
+  const [la, lm, ld] = lunes.split('-').map(Number);
+  const [da, dm, dd] = domingo.split('-').map(Number);
+  rango.textContent = new Date(la, lm - 1, ld).toLocaleDateString('es-PY', opts) +
+    ' – ' + new Date(da, dm - 1, dd).toLocaleDateString('es-PY', opts);
+
+  const graf = document.getElementById('grafico-semana');
   graf.innerHTML = '';
   const dias = [];
-  for (let i = 6; i >= 0; i--) {
-    const f = diasAtras(i);
+  for (let i = 0; i < 7; i++) {
+    const f = sumarDias(lunes, i);
     const regsDia = registros.filter(r => r.fecha === f);
     dias.push({ fecha: f, neto: bruto(regsDia) - gastos(regsDia) });
   }
   const maxAbs = Math.max(1, ...dias.map(d => Math.abs(d.neto)));
-  dias.forEach(d => {
+  const etiquetas = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  dias.forEach((d, i) => {
     const col = document.createElement('div');
-    col.className = 'columna';
+    col.className = 'columna' + (d.fecha === hoy ? ' hoy' : '');
     const palo = document.createElement('div');
-    palo.className = 'palo' + (d.neto < 0 ? ' negativo' : '');
+    palo.className = 'palo' + (d.neto < 0 ? ' negativo' : '') + (d.fecha > hoy ? ' futuro' : '');
     palo.style.height = Math.max(2, (Math.abs(d.neto) / maxAbs) * 100) + '%';
     palo.title = fechaLegible(d.fecha) + ': ' + fmt(d.neto);
     const lbl = document.createElement('small');
-    lbl.textContent = fechaLegible(d.fecha).split(',')[0];
+    lbl.textContent = etiquetas[i];
     col.append(palo, lbl);
     graf.appendChild(col);
   });

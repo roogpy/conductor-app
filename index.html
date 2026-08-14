@@ -38,7 +38,7 @@
         </label>
       </div>
       <div class="fila">
-        <label>Monto (₲) <input type="number" id="g-monto" min="1" inputmode="numeric" required placeholder="150000"></label>
+        <label>Monto (₲) <input type="text" id="g-monto" inputmode="numeric" autocomplete="off" required placeholder="150.000"></label>
         <label>Viajes <input type="number" id="g-viajes" min="0" inputmode="numeric" placeholder="opcional"></label>
       </div>
       <button type="submit" class="btn verde">Guardar ganancia</button>
@@ -61,7 +61,7 @@
         </label>
       </div>
       <div class="fila">
-        <label>Monto (₲) <input type="number" id="e-monto" min="1" inputmode="numeric" required placeholder="50000"></label>
+        <label>Monto (₲) <input type="text" id="e-monto" inputmode="numeric" autocomplete="off" required placeholder="50.000"></label>
         <label>Nota <input type="text" id="e-nota" maxlength="60" placeholder="opcional"></label>
       </div>
       <button type="submit" class="btn rojo">Guardar gasto</button>
@@ -88,7 +88,7 @@
   <section id="tab-resumen" class="tab">
     <div class="selector-periodo" id="selector-periodo">
       <button data-periodo="hoy" class="activa" type="button">Hoy</button>
-      <button data-periodo="semana" type="button">7 días</button>
+      <button data-periodo="semana" type="button">Semana</button>
       <button data-periodo="mes" type="button">Mes</button>
     </div>
     <div class="tarjetas-mini">
@@ -98,7 +98,10 @@
     </div>
     <div class="tarjeta"><h2>Por plataforma</h2><div id="res-plataformas"></div></div>
     <div class="tarjeta"><h2>Gastos por categoría</h2><div id="res-categorias"></div></div>
-    <div class="tarjeta"><h2>Neto últimos 7 días</h2><div id="grafico-7d" class="grafico"></div></div>
+    <div class="tarjeta">
+      <h2>Neto de la semana <small id="rango-semana" class="rango"></small></h2>
+      <div id="grafico-semana" class="grafico"></div>
+    </div>
   </section>
 </main>
 
