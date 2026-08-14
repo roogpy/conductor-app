@@ -220,12 +220,12 @@ input:focus, select:focus { outline: 2px solid var(--acento); border-color: tran
   background: var(--verde);
   min-height: 2px;
 }
-.grafico .columna .palo.negativo { background: var(--rojo); }
 .grafico .columna .palo.futuro { opacity: .35; }
 .grafico .columna small { font-size: .65rem; color: var(--texto-suave); }
 .grafico .columna.hoy small { color: var(--acento); font-weight: 700; }
 
-.leyenda { color: var(--texto-suave); font-size: .7rem; margin-top: 10px; }
+.tarjeta h2.con-total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tarjeta h2.con-total strong { color: var(--verde); font-size: 1rem; }
 
 .nav-semana, .nav-mes {
   display: flex;

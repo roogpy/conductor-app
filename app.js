@@ -432,7 +432,9 @@ function renderResumen() {
     const brutoDia = bruto(regsDia);
     dias.push({ fecha: f, brutoDia, neto: brutoDia - gastos(regsDia) });
   }
-  const maxAbs = Math.max(1, ...dias.map(d => Math.abs(d.neto)));
+  document.getElementById('bruto-semana').textContent = fmt(dias.reduce((s, d) => s + d.brutoDia, 0));
+
+  const maxBruto = Math.max(1, ...dias.map(d => d.brutoDia));
   const etiquetas = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   dias.forEach((d, i) => {
     const col = document.createElement('div');
@@ -449,8 +451,8 @@ function renderResumen() {
     const pista = document.createElement('div');
     pista.className = 'pista';
     const palo = document.createElement('div');
-    palo.className = 'palo' + (d.neto < 0 ? ' negativo' : '') + (d.fecha > hoy ? ' futuro' : '');
-    palo.style.height = Math.max(2, (Math.abs(d.neto) / maxAbs) * 100) + '%';
+    palo.className = 'palo' + (d.fecha > hoy ? ' futuro' : '');
+    palo.style.height = Math.max(2, (d.brutoDia / maxBruto) * 100) + '%';
     pista.appendChild(palo);
 
     const lbl = document.createElement('small');
