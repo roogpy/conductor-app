@@ -312,12 +312,18 @@ document.getElementById('btn-csv').addEventListener('click', () => {
 // ---------- Render: tab Resumen ----------
 let periodo = 'hoy';
 let semanaAtras = 0; // 0 = semana en curso, 1 = la anterior, ...
+let mesAtras = 0;    // idem para el grafico por mes
+
+// Con el periodo Mes el grafico pasa a ser mensual (una barra por semana);
+// con Hoy y Semana muestra la semana dia por dia.
+function graficoEsMensual() { return periodo === 'mes'; }
 
 document.getElementById('selector-periodo').addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   periodo = btn.dataset.periodo;
-  semanaAtras = 0; // cambiar de periodo vuelve siempre a la semana en curso
+  semanaAtras = 0; // cambiar de periodo vuelve siempre al periodo en curso
+  mesAtras = 0;
   document.querySelectorAll('#selector-periodo button').forEach(b => b.classList.toggle('activa', b === btn));
   renderResumen();
 });
@@ -327,20 +333,44 @@ function lunesVisible() {
   return sumarDias(lunesDe(hoyISO()), -7 * semanaAtras);
 }
 
-// Cuantas semanas atras se puede ir: hasta la del registro mas viejo.
+// Mes que se esta mirando, como 'YYYY-MM'.
+function mesVisible() {
+  const [a, m] = hoyISO().split('-').map(Number);
+  const d = new Date(a, m - 1 - mesAtras, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function fechaMasVieja() {
+  return registros.reduce((min, r) => (r.fecha < min ? r.fecha : min), registros[0].fecha);
+}
+
+// Cuanto se puede retroceder: hasta el periodo del registro mas viejo.
 function semanasConDatos() {
   if (!registros.length) return 0;
-  const primera = registros.reduce((min, r) => (r.fecha < min ? r.fecha : min), registros[0].fecha);
-  const ms = new Date(lunesDe(hoyISO())) - new Date(lunesDe(primera));
+  const ms = new Date(lunesDe(hoyISO())) - new Date(lunesDe(fechaMasVieja()));
   return Math.max(0, Math.round(ms / (7 * 24 * 60 * 60 * 1000)));
 }
 
-document.getElementById('semana-prev').addEventListener('click', () => {
-  if (semanaAtras < semanasConDatos()) { semanaAtras++; renderResumen(); }
+function mesesConDatos() {
+  if (!registros.length) return 0;
+  const [pa, pm] = fechaMasVieja().split('-').map(Number);
+  const [ha, hm] = hoyISO().split('-').map(Number);
+  return Math.max(0, (ha - pa) * 12 + (hm - pm));
+}
+
+function retroceder() { return graficoEsMensual() ? mesesConDatos() : semanasConDatos(); }
+function atras() { return graficoEsMensual() ? mesAtras : semanaAtras; }
+
+document.getElementById('grafico-prev').addEventListener('click', () => {
+  if (atras() >= retroceder()) return;
+  if (graficoEsMensual()) mesAtras++; else semanaAtras++;
+  renderResumen();
 });
 
-document.getElementById('semana-next').addEventListener('click', () => {
-  if (semanaAtras > 0) { semanaAtras--; renderResumen(); }
+document.getElementById('grafico-next').addEventListener('click', () => {
+  if (atras() <= 0) return;
+  if (graficoEsMensual()) mesAtras--; else semanaAtras--;
+  renderResumen();
 });
 
 function regsDelPeriodo() {
@@ -350,7 +380,7 @@ function regsDelPeriodo() {
     const lunes = lunesVisible();
     return registrosEnRango(lunes, sumarDias(lunes, 6));
   }
-  return registros.filter(r => r.fecha.startsWith(hoy.slice(0, 7)));
+  return registros.filter(r => r.fecha.startsWith(mesVisible()));
 }
 
 function barra(cont, etiqueta, valor, max, color) {
@@ -407,56 +437,114 @@ function renderResumen() {
     totalesC.forEach(t => barra(contC, CATEGORIAS[t.c], t.total, maxC, 'var(--rojo)'));
   }
 
-  // Gráfico neto de la semana que se está mirando (lunes a domingo)
-  const hoy = hoyISO();
-  const lunes = lunesVisible();
-  const domingo = sumarDias(lunes, 6);
+  // Gráfico de brutos: por día si se mira una semana, por semana si se mira un mes
+  const barras = graficoEsMensual() ? barrasDelMes(mesVisible()) : barrasDeLaSemana(lunesVisible());
 
-  const rango = document.getElementById('rango-semana');
+  document.getElementById('rango-grafico').textContent = graficoEsMensual()
+    ? tituloMes(mesVisible())
+    : rangoSemana(lunesVisible());
+  document.getElementById('bruto-grafico').textContent =
+    fmt(barras.reduce((s, b2) => s + b2.brutoBarra, 0));
+  document.getElementById('titulo-grafico').textContent =
+    graficoEsMensual() ? 'Bruto del mes' : 'Bruto de la semana';
+
+  document.getElementById('grafico-prev').disabled = atras() >= retroceder();
+  document.getElementById('grafico-next').disabled = atras() <= 0;
+
+  dibujarBarras(document.getElementById('grafico-barras'), barras);
+}
+
+// Una barra por día, de lunes a domingo.
+function barrasDeLaSemana(lunes) {
+  const hoy = hoyISO();
+  const etiquetas = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  return etiquetas.map((etiqueta, i) => {
+    const f = sumarDias(lunes, i);
+    const regsDia = registros.filter(r => r.fecha === f);
+    const brutoBarra = bruto(regsDia);
+    return {
+      etiqueta,
+      brutoBarra,
+      esHoy: f === hoy,
+      esFuturo: f > hoy,
+      titulo: fechaLegible(f) + ' · Bruto: ' + fmt(brutoBarra) +
+        ' · Neto: ' + fmt(brutoBarra - gastos(regsDia)),
+    };
+  });
+}
+
+// Una barra por semana del mes (lun–dom), recortada a los días del mes: la
+// primera y la última suelen ser parciales.
+function barrasDelMes(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  const ultimo = new Date(a, m, 0).getDate();
+  const hoy = hoyISO();
+  const barras = [];
+
+  for (let d = 1; d <= ultimo;) {
+    const desde = mes + '-' + String(d).padStart(2, '0');
+    const diaSemana = (new Date(a, m - 1, d).getDay() + 6) % 7; // 0 = lunes
+    const hastaDia = Math.min(ultimo, d + (6 - diaSemana));
+    const hasta = mes + '-' + String(hastaDia).padStart(2, '0');
+
+    const regsRango = registros.filter(r => r.fecha >= desde && r.fecha <= hasta);
+    const brutoBarra = bruto(regsRango);
+    barras.push({
+      etiqueta: d === hastaDia ? String(d) : d + '-' + hastaDia,
+      brutoBarra,
+      esHoy: hoy >= desde && hoy <= hasta,
+      esFuturo: desde > hoy,
+      titulo: d + ' al ' + hastaDia + ' · Bruto: ' + fmt(brutoBarra) +
+        ' · Neto: ' + fmt(brutoBarra - gastos(regsRango)),
+    });
+    d = hastaDia + 1;
+  }
+  return barras;
+}
+
+function rangoSemana(lunes) {
+  const domingo = sumarDias(lunes, 6);
   const opts = { day: 'numeric', month: 'short' };
   const [la, lm, ld] = lunes.split('-').map(Number);
   const [da, dm, dd] = domingo.split('-').map(Number);
   const conAnio = la !== new Date().getFullYear();
-  rango.textContent = new Date(la, lm - 1, ld).toLocaleDateString('es-PY', opts) +
+  return new Date(la, lm - 1, ld).toLocaleDateString('es-PY', opts) +
     ' – ' + new Date(da, dm - 1, dd).toLocaleDateString('es-PY', conAnio ? { ...opts, year: 'numeric' } : opts);
+}
 
-  document.getElementById('semana-prev').disabled = semanaAtras >= semanasConDatos();
-  document.getElementById('semana-next').disabled = semanaAtras <= 0;
+function tituloMes(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  const opts = a !== new Date().getFullYear()
+    ? { month: 'long', year: 'numeric' }
+    : { month: 'long' };
+  return new Date(a, m - 1, 1).toLocaleDateString('es-PY', opts);
+}
 
-  const graf = document.getElementById('grafico-semana');
+function dibujarBarras(graf, barras) {
   graf.innerHTML = '';
-  const dias = [];
-  for (let i = 0; i < 7; i++) {
-    const f = sumarDias(lunes, i);
-    const regsDia = registros.filter(r => r.fecha === f);
-    const brutoDia = bruto(regsDia);
-    dias.push({ fecha: f, brutoDia, neto: brutoDia - gastos(regsDia) });
-  }
-  document.getElementById('bruto-semana').textContent = fmt(dias.reduce((s, d) => s + d.brutoDia, 0));
+  const maxBruto = Math.max(1, ...barras.map(b => b.brutoBarra));
 
-  const maxBruto = Math.max(1, ...dias.map(d => d.brutoDia));
-  const etiquetas = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  dias.forEach((d, i) => {
+  barras.forEach(b => {
     const col = document.createElement('div');
-    col.className = 'columna' + (d.fecha === hoy ? ' hoy' : '');
-    col.title = fechaLegible(d.fecha) + ' · Bruto: ' + fmt(d.brutoDia) + ' · Neto: ' + fmt(d.neto);
+    col.className = 'columna' + (b.esHoy ? ' hoy' : '');
+    col.title = b.titulo;
 
-    // El bruto del dia arriba de la barra; los dias sin nada quedan en blanco.
+    // El bruto arriba de la barra; los tramos sin nada quedan en blanco.
     const valor = document.createElement('small');
     valor.className = 'valor';
-    valor.textContent = d.brutoDia > 0 ? fmtCorto(d.brutoDia) : '';
+    valor.textContent = b.brutoBarra > 0 ? fmtCorto(b.brutoBarra) : '';
 
     // La barra vive en su propia pista de alto fijo, asi la etiqueta de arriba
-    // no le come altura ni distorsiona la proporcion entre dias.
+    // no le come altura ni distorsiona la proporcion entre barras.
     const pista = document.createElement('div');
     pista.className = 'pista';
     const palo = document.createElement('div');
-    palo.className = 'palo' + (d.fecha > hoy ? ' futuro' : '');
-    palo.style.height = Math.max(2, (d.brutoDia / maxBruto) * 100) + '%';
+    palo.className = 'palo' + (b.esFuturo ? ' futuro' : '');
+    palo.style.height = Math.max(2, (b.brutoBarra / maxBruto) * 100) + '%';
     pista.appendChild(palo);
 
     const lbl = document.createElement('small');
-    lbl.textContent = etiquetas[i];
+    lbl.textContent = b.etiqueta;
     col.append(valor, pista, lbl);
     graf.appendChild(col);
   });
