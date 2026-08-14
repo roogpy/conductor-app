@@ -185,17 +185,33 @@ input:focus, select:focus { outline: 2px solid var(--acento); border-color: tran
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  height: 140px;
+  height: 160px;
   padding-top: 8px;
 }
 .grafico .columna {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   align-items: center;
   height: 100%;
   gap: 4px;
+}
+/* display block + min-height: la etiqueta reserva su alto aunque el dia venga
+   vacio, si no las pistas quedan de distinto alto y las barras no comparan. */
+.grafico .columna .valor {
+  flex: none;
+  display: block;
+  font-size: .6rem;
+  line-height: 1;
+  min-height: 1em;
+  white-space: nowrap;
+}
+.grafico .columna .pista {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
 }
 .grafico .columna .palo {
   width: 100%;
@@ -207,6 +223,8 @@ input:focus, select:focus { outline: 2px solid var(--acento); border-color: tran
 .grafico .columna .palo.futuro { opacity: .35; }
 .grafico .columna small { font-size: .65rem; color: var(--texto-suave); }
 .grafico .columna.hoy small { color: var(--acento); font-weight: 700; }
+
+.leyenda { color: var(--texto-suave); font-size: .7rem; margin-top: 10px; }
 
 .tarjeta h2 .rango { color: var(--texto-suave); font-size: .78rem; font-weight: 400; margin-left: 6px; }
 

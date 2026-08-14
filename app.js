@@ -66,6 +66,14 @@ function lunesDe(iso) {
   return sumarDias(iso, -desdeLunes);
 }
 
+// Monto abreviado, para que los 7 dias entren en el ancho de un celular.
+function fmtCorto(n) {
+  const abs = Math.abs(n);
+  if (abs < 1000) return String(Math.round(n));
+  if (abs < 1000000) return Math.round(n / 1000) + 'k';
+  return (n / 1000000).toFixed(1).replace('.', ',') + 'M';
+}
+
 // ---------- Separador de miles en los campos de monto ----------
 function formatoMiles(texto) {
   const digitos = String(texto).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
@@ -377,20 +385,33 @@ function renderResumen() {
   for (let i = 0; i < 7; i++) {
     const f = sumarDias(lunes, i);
     const regsDia = registros.filter(r => r.fecha === f);
-    dias.push({ fecha: f, neto: bruto(regsDia) - gastos(regsDia) });
+    const brutoDia = bruto(regsDia);
+    dias.push({ fecha: f, brutoDia, neto: brutoDia - gastos(regsDia) });
   }
   const maxAbs = Math.max(1, ...dias.map(d => Math.abs(d.neto)));
   const etiquetas = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   dias.forEach((d, i) => {
     const col = document.createElement('div');
     col.className = 'columna' + (d.fecha === hoy ? ' hoy' : '');
+    col.title = fechaLegible(d.fecha) + ' · Bruto: ' + fmt(d.brutoDia) + ' · Neto: ' + fmt(d.neto);
+
+    // El bruto del dia arriba de la barra; los dias sin nada quedan en blanco.
+    const valor = document.createElement('small');
+    valor.className = 'valor';
+    valor.textContent = d.brutoDia > 0 ? fmtCorto(d.brutoDia) : '';
+
+    // La barra vive en su propia pista de alto fijo, asi la etiqueta de arriba
+    // no le come altura ni distorsiona la proporcion entre dias.
+    const pista = document.createElement('div');
+    pista.className = 'pista';
     const palo = document.createElement('div');
     palo.className = 'palo' + (d.neto < 0 ? ' negativo' : '') + (d.fecha > hoy ? ' futuro' : '');
     palo.style.height = Math.max(2, (Math.abs(d.neto) / maxAbs) * 100) + '%';
-    palo.title = fechaLegible(d.fecha) + ': ' + fmt(d.neto);
+    pista.appendChild(palo);
+
     const lbl = document.createElement('small');
     lbl.textContent = etiquetas[i];
-    col.append(palo, lbl);
+    col.append(valor, pista, lbl);
     graf.appendChild(col);
   });
 }
