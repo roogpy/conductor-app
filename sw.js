@@ -1,9 +1,11 @@
 const CACHE = 'conductor-v2';
+// Los assets versionados (?v=N) deben coincidir con los de index.html: si no,
+// el SW cachea una URL que la pagina nunca pide y se sirve la version vieja.
 const ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
+  './styles.css?v=2',
+  './app.js?v=2',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
