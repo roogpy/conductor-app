@@ -76,8 +76,12 @@
   <!-- TAB HISTORIAL -->
   <section id="tab-historial" class="tab">
     <div class="tarjeta">
-      <div class="fila entre">
+      <div class="nav-mes">
+        <button id="mes-prev" class="flecha" type="button" aria-label="Mes anterior">‹</button>
         <select id="filtro-mes"></select>
+        <button id="mes-next" class="flecha" type="button" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="fila derecha">
         <button id="btn-csv" class="btn gris" type="button">⬇ Exportar CSV</button>
       </div>
       <div id="historial"></div>

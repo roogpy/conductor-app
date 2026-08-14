@@ -232,6 +232,10 @@ function renderHistorial() {
   });
   sel.value = meses.includes(previo) ? previo : meses[0];
 
+  // La lista va del mes mas nuevo al mas viejo: retroceder es bajar en el indice.
+  document.getElementById('mes-prev').disabled = sel.selectedIndex >= sel.options.length - 1;
+  document.getElementById('mes-next').disabled = sel.selectedIndex <= 0;
+
   const cont = document.getElementById('historial');
   cont.innerHTML = '';
   const delMes = registros.filter(r => r.fecha.startsWith(sel.value));
@@ -269,6 +273,19 @@ function renderHistorial() {
 }
 
 document.getElementById('filtro-mes').addEventListener('change', renderHistorial);
+
+// Las flechas se mueven por los meses del selector (los que tienen registros,
+// mas el actual): asi nunca caen en un mes vacio y ambos controles coinciden.
+function moverMes(paso) {
+  const sel = document.getElementById('filtro-mes');
+  const i = sel.selectedIndex + paso;
+  if (i < 0 || i >= sel.options.length) return;
+  sel.selectedIndex = i;
+  renderHistorial();
+}
+
+document.getElementById('mes-prev').addEventListener('click', () => moverMes(1));
+document.getElementById('mes-next').addEventListener('click', () => moverMes(-1));
 
 // ---------- Exportar CSV ----------
 document.getElementById('btn-csv').addEventListener('click', () => {
