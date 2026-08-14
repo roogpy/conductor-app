@@ -255,7 +255,9 @@ function renderHistorial() {
     grupo.className = 'grupo-dia';
     const h3 = document.createElement('h3');
     const spanFecha = document.createElement('span');
-    spanFecha.textContent = fechaLegible(fecha, true);
+    // Sin el año: ya lo dice el selector de mes, y sin él los totales entran
+    // en una línea en el ancho de un celular.
+    spanFecha.textContent = fechaLegible(fecha);
     const totales = document.createElement('span');
     totales.className = 'totales-dia';
     const spanBruto = document.createElement('span');
