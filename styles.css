@@ -226,7 +226,32 @@ input:focus, select:focus { outline: 2px solid var(--acento); border-color: tran
 
 .leyenda { color: var(--texto-suave); font-size: .7rem; margin-top: 10px; }
 
-.tarjeta h2 .rango { color: var(--texto-suave); font-size: .78rem; font-weight: 400; margin-left: 6px; }
+.nav-semana {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.nav-semana span {
+  flex: 1;
+  text-align: center;
+  font-size: .82rem;
+  color: var(--texto-suave);
+}
+.flecha {
+  flex: none;
+  width: 40px;
+  height: 34px;
+  border: 1px solid var(--borde);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--texto);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.flecha:disabled { opacity: .3; cursor: default; }
+.flecha:active:not(:disabled) { transform: scale(.96); }
 
 .nav-inferior {
   position: fixed;

@@ -294,20 +294,43 @@ document.getElementById('btn-csv').addEventListener('click', () => {
 
 // ---------- Render: tab Resumen ----------
 let periodo = 'hoy';
+let semanaAtras = 0; // 0 = semana en curso, 1 = la anterior, ...
 
 document.getElementById('selector-periodo').addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   periodo = btn.dataset.periodo;
+  semanaAtras = 0; // cambiar de periodo vuelve siempre a la semana en curso
   document.querySelectorAll('#selector-periodo button').forEach(b => b.classList.toggle('activa', b === btn));
   renderResumen();
+});
+
+// Lunes de la semana que se esta mirando.
+function lunesVisible() {
+  return sumarDias(lunesDe(hoyISO()), -7 * semanaAtras);
+}
+
+// Cuantas semanas atras se puede ir: hasta la del registro mas viejo.
+function semanasConDatos() {
+  if (!registros.length) return 0;
+  const primera = registros.reduce((min, r) => (r.fecha < min ? r.fecha : min), registros[0].fecha);
+  const ms = new Date(lunesDe(hoyISO())) - new Date(lunesDe(primera));
+  return Math.max(0, Math.round(ms / (7 * 24 * 60 * 60 * 1000)));
+}
+
+document.getElementById('semana-prev').addEventListener('click', () => {
+  if (semanaAtras < semanasConDatos()) { semanaAtras++; renderResumen(); }
+});
+
+document.getElementById('semana-next').addEventListener('click', () => {
+  if (semanaAtras > 0) { semanaAtras--; renderResumen(); }
 });
 
 function regsDelPeriodo() {
   const hoy = hoyISO();
   if (periodo === 'hoy') return registrosEnRango(hoy, hoy);
   if (periodo === 'semana') {
-    const lunes = lunesDe(hoy);
+    const lunes = lunesVisible();
     return registrosEnRango(lunes, sumarDias(lunes, 6));
   }
   return registros.filter(r => r.fecha.startsWith(hoy.slice(0, 7)));
@@ -367,17 +390,21 @@ function renderResumen() {
     totalesC.forEach(t => barra(contC, CATEGORIAS[t.c], t.total, maxC, 'var(--rojo)'));
   }
 
-  // Gráfico neto de la semana en curso (lunes a domingo)
+  // Gráfico neto de la semana que se está mirando (lunes a domingo)
   const hoy = hoyISO();
-  const lunes = lunesDe(hoy);
+  const lunes = lunesVisible();
   const domingo = sumarDias(lunes, 6);
 
   const rango = document.getElementById('rango-semana');
   const opts = { day: 'numeric', month: 'short' };
   const [la, lm, ld] = lunes.split('-').map(Number);
   const [da, dm, dd] = domingo.split('-').map(Number);
+  const conAnio = la !== new Date().getFullYear();
   rango.textContent = new Date(la, lm - 1, ld).toLocaleDateString('es-PY', opts) +
-    ' – ' + new Date(da, dm - 1, dd).toLocaleDateString('es-PY', opts);
+    ' – ' + new Date(da, dm - 1, dd).toLocaleDateString('es-PY', conAnio ? { ...opts, year: 'numeric' } : opts);
+
+  document.getElementById('semana-prev').disabled = semanaAtras >= semanasConDatos();
+  document.getElementById('semana-next').disabled = semanaAtras <= 0;
 
   const graf = document.getElementById('grafico-semana');
   graf.innerHTML = '';
